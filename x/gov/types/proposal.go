@@ -1,13 +1,14 @@
 package types
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
 
-	"gopkg.in/yaml.v2"
+	"github.com/gogo/protobuf/proto"
+	yaml "gopkg.in/yaml.v2"
 
+	"github.com/cosmos/cosmos-sdk/codec/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 )
@@ -15,31 +16,30 @@ import (
 // DefaultStartingProposalID is 1
 const DefaultStartingProposalID uint64 = 1
 
-// Proposal defines a struct used by the governance module to allow for voting
-// on network changes.
-type Proposal struct {
-	Content `json:"content" yaml:"content"` // Proposal content interface
-	ProposalBase
-}
-
 // NewProposal creates a new Proposal instance
-func NewProposal(content Content, id uint64, submitTime, depositEndTime time.Time) Proposal {
-	return Proposal{
-		Content: content,
-		ProposalBase: ProposalBase{
-			ProposalID:       id,
-			Status:           StatusDepositPeriod,
-			FinalTallyResult: EmptyTallyResult(),
-			TotalDeposit:     sdk.NewCoins(),
-			SubmitTime:       submitTime,
-			DepositEndTime:   depositEndTime,
-		},
+func NewProposal(content Content, id uint64, submitTime, depositEndTime time.Time) (Proposal, error) {
+	p := Proposal{
+		ProposalId:       id,
+		Status:           StatusDepositPeriod,
+		FinalTallyResult: EmptyTallyResult(),
+		TotalDeposit:     sdk.NewCoins(),
+		SubmitTime:       submitTime,
+		DepositEndTime:   depositEndTime,
 	}
-}
 
-// Equal returns true if two Proposal types are equal.
-func (p Proposal) Equal(other Proposal) bool {
-	return p.ProposalBase.Equal(other.ProposalBase) && p.Content.String() == other.Content.String()
+	msg, ok := content.(proto.Message)
+	if !ok {
+		return Proposal{}, fmt.Errorf("%T does not implement proto.Message", content)
+	}
+
+	any, err := types.NewAnyWithValue(msg)
+	if err != nil {
+		return Proposal{}, err
+	}
+
+	p.Content = any
+
+	return p, nil
 }
 
 // String implements stringer interface
@@ -48,8 +48,49 @@ func (p Proposal) String() string {
 	return string(out)
 }
 
+// GetContent returns the proposal Content
+func (p Proposal) GetContent() Content {
+	content, ok := p.Content.GetCachedValue().(Content)
+	if !ok {
+		return nil
+	}
+	return content
+}
+
+func (p Proposal) ProposalType() string {
+	content := p.GetContent()
+	if content == nil {
+		return ""
+	}
+	return content.ProposalType()
+}
+
+func (p Proposal) ProposalRoute() string {
+	content := p.GetContent()
+	if content == nil {
+		return ""
+	}
+	return content.ProposalRoute()
+}
+
+func (p Proposal) GetTitle() string {
+	content := p.GetContent()
+	if content == nil {
+		return ""
+	}
+	return content.GetTitle()
+}
+
+// UnpackInterfaces implements UnpackInterfacesMessage.UnpackInterfaces
+func (p Proposal) UnpackInterfaces(unpacker types.AnyUnpacker) error {
+	var content Content
+	return unpacker.UnpackAny(p.Content, &content)
+}
+
 // Proposals is an array of proposal
 type Proposals []Proposal
+
+var _ types.UnpackInterfacesMessage = Proposals{}
 
 // Equal returns true if two slices (order-dependant) of proposals are equal.
 func (p Proposals) Equal(other Proposals) bool {
@@ -71,10 +112,21 @@ func (p Proposals) String() string {
 	out := "ID - (Status) [Type] Title\n"
 	for _, prop := range p {
 		out += fmt.Sprintf("%d - (%s) [%s] %s\n",
-			prop.ProposalID, prop.Status,
+			prop.ProposalId, prop.Status,
 			prop.ProposalType(), prop.GetTitle())
 	}
 	return strings.TrimSpace(out)
+}
+
+// UnpackInterfaces implements UnpackInterfacesMessage.UnpackInterfaces
+func (p Proposals) UnpackInterfaces(unpacker types.AnyUnpacker) error {
+	for _, x := range p {
+		err := x.UnpackInterfaces(unpacker)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 type (
@@ -84,28 +136,11 @@ type (
 
 // ProposalStatusFromString turns a string into a ProposalStatus
 func ProposalStatusFromString(str string) (ProposalStatus, error) {
-	switch str {
-	case "DepositPeriod":
-		return StatusDepositPeriod, nil
-
-	case "VotingPeriod":
-		return StatusVotingPeriod, nil
-
-	case "Passed":
-		return StatusPassed, nil
-
-	case "Rejected":
-		return StatusRejected, nil
-
-	case "Failed":
-		return StatusFailed, nil
-
-	case "":
-		return StatusNil, nil
-
-	default:
-		return ProposalStatus(0xff), fmt.Errorf("'%s' is not a valid proposal status", str)
+	num, ok := ProposalStatus_value[str]
+	if !ok {
+		return StatusNil, fmt.Errorf("'%s' is not a valid proposal status", str)
 	}
+	return ProposalStatus(num), nil
 }
 
 // ValidProposalStatus returns true if the proposal status is valid and false
@@ -130,51 +165,6 @@ func (status ProposalStatus) Marshal() ([]byte, error) {
 func (status *ProposalStatus) Unmarshal(data []byte) error {
 	*status = ProposalStatus(data[0])
 	return nil
-}
-
-// MarshalJSON Marshals to JSON using string representation of the status
-func (status ProposalStatus) MarshalJSON() ([]byte, error) {
-	return json.Marshal(status.String())
-}
-
-// UnmarshalJSON Unmarshals from JSON assuming Bech32 encoding
-func (status *ProposalStatus) UnmarshalJSON(data []byte) error {
-	var s string
-	err := json.Unmarshal(data, &s)
-	if err != nil {
-		return err
-	}
-
-	bz2, err := ProposalStatusFromString(s)
-	if err != nil {
-		return err
-	}
-
-	*status = bz2
-	return nil
-}
-
-// String implements the Stringer interface.
-func (status ProposalStatus) String() string {
-	switch status {
-	case StatusDepositPeriod:
-		return "DepositPeriod"
-
-	case StatusVotingPeriod:
-		return "VotingPeriod"
-
-	case StatusPassed:
-		return "Passed"
-
-	case StatusRejected:
-		return "Rejected"
-
-	case StatusFailed:
-		return "Failed"
-
-	default:
-		return ""
-	}
 }
 
 // Format implements the fmt.Formatter interface.

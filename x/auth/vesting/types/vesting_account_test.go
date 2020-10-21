@@ -1,16 +1,15 @@
 package types_test
 
 import (
-	"encoding/json"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/tendermint/tendermint/crypto/secp256k1"
 	tmtime "github.com/tendermint/tendermint/types/time"
 
+	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
+	"github.com/cosmos/cosmos-sdk/testutil/testdata"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	authexported "github.com/cosmos/cosmos-sdk/x/auth/exported"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/cosmos/cosmos-sdk/x/auth/vesting/types"
 )
@@ -24,7 +23,7 @@ func TestGetVestedCoinsContVestingAcc(t *testing.T) {
 	now := tmtime.Now()
 	endTime := now.Add(24 * time.Hour)
 
-	_, _, addr := authtypes.KeyTestPubAddr()
+	_, _, addr := testdata.KeyTestPubAddr()
 	origCoins := sdk.Coins{sdk.NewInt64Coin(feeDenom, 1000), sdk.NewInt64Coin(stakeDenom, 100)}
 	bacc := authtypes.NewBaseAccountWithAddress(addr)
 	cva := types.NewContinuousVestingAccount(bacc, origCoins, now.Unix(), endTime.Unix())
@@ -50,7 +49,7 @@ func TestGetVestingCoinsContVestingAcc(t *testing.T) {
 	now := tmtime.Now()
 	endTime := now.Add(24 * time.Hour)
 
-	_, _, addr := authtypes.KeyTestPubAddr()
+	_, _, addr := testdata.KeyTestPubAddr()
 	origCoins := sdk.Coins{sdk.NewInt64Coin(feeDenom, 1000), sdk.NewInt64Coin(stakeDenom, 100)}
 	bacc := authtypes.NewBaseAccountWithAddress(addr)
 	cva := types.NewContinuousVestingAccount(bacc, origCoins, now.Unix(), endTime.Unix())
@@ -72,7 +71,7 @@ func TestSpendableCoinsContVestingAcc(t *testing.T) {
 	now := tmtime.Now()
 	endTime := now.Add(24 * time.Hour)
 
-	_, _, addr := authtypes.KeyTestPubAddr()
+	_, _, addr := testdata.KeyTestPubAddr()
 	origCoins := sdk.Coins{sdk.NewInt64Coin(feeDenom, 1000), sdk.NewInt64Coin(stakeDenom, 100)}
 	bacc := authtypes.NewBaseAccountWithAddress(addr)
 
@@ -100,7 +99,7 @@ func TestTrackDelegationContVestingAcc(t *testing.T) {
 	now := tmtime.Now()
 	endTime := now.Add(24 * time.Hour)
 
-	_, _, addr := authtypes.KeyTestPubAddr()
+	_, _, addr := testdata.KeyTestPubAddr()
 	origCoins := sdk.Coins{sdk.NewInt64Coin(feeDenom, 1000), sdk.NewInt64Coin(stakeDenom, 100)}
 	bacc := authtypes.NewBaseAccountWithAddress(addr)
 
@@ -139,7 +138,7 @@ func TestTrackUndelegationContVestingAcc(t *testing.T) {
 	now := tmtime.Now()
 	endTime := now.Add(24 * time.Hour)
 
-	_, _, addr := authtypes.KeyTestPubAddr()
+	_, _, addr := testdata.KeyTestPubAddr()
 	origCoins := sdk.Coins{sdk.NewInt64Coin(feeDenom, 1000), sdk.NewInt64Coin(stakeDenom, 100)}
 	bacc := authtypes.NewBaseAccountWithAddress(addr)
 
@@ -187,7 +186,7 @@ func TestGetVestedCoinsDelVestingAcc(t *testing.T) {
 	now := tmtime.Now()
 	endTime := now.Add(24 * time.Hour)
 
-	_, _, addr := authtypes.KeyTestPubAddr()
+	_, _, addr := testdata.KeyTestPubAddr()
 	origCoins := sdk.Coins{sdk.NewInt64Coin(feeDenom, 1000), sdk.NewInt64Coin(stakeDenom, 100)}
 	bacc := authtypes.NewBaseAccountWithAddress(addr)
 
@@ -205,7 +204,7 @@ func TestGetVestingCoinsDelVestingAcc(t *testing.T) {
 	now := tmtime.Now()
 	endTime := now.Add(24 * time.Hour)
 
-	_, _, addr := authtypes.KeyTestPubAddr()
+	_, _, addr := testdata.KeyTestPubAddr()
 	origCoins := sdk.Coins{sdk.NewInt64Coin(feeDenom, 1000), sdk.NewInt64Coin(stakeDenom, 100)}
 	bacc := authtypes.NewBaseAccountWithAddress(addr)
 
@@ -223,7 +222,7 @@ func TestSpendableCoinsDelVestingAcc(t *testing.T) {
 	now := tmtime.Now()
 	endTime := now.Add(24 * time.Hour)
 
-	_, _, addr := authtypes.KeyTestPubAddr()
+	_, _, addr := testdata.KeyTestPubAddr()
 	origCoins := sdk.Coins{sdk.NewInt64Coin(feeDenom, 1000), sdk.NewInt64Coin(stakeDenom, 100)}
 	bacc := authtypes.NewBaseAccountWithAddress(addr)
 
@@ -260,7 +259,7 @@ func TestTrackDelegationDelVestingAcc(t *testing.T) {
 	now := tmtime.Now()
 	endTime := now.Add(24 * time.Hour)
 
-	_, _, addr := authtypes.KeyTestPubAddr()
+	_, _, addr := testdata.KeyTestPubAddr()
 	origCoins := sdk.Coins{sdk.NewInt64Coin(feeDenom, 1000), sdk.NewInt64Coin(stakeDenom, 100)}
 	bacc := authtypes.NewBaseAccountWithAddress(addr)
 
@@ -297,7 +296,7 @@ func TestTrackUndelegationDelVestingAcc(t *testing.T) {
 	now := tmtime.Now()
 	endTime := now.Add(24 * time.Hour)
 
-	_, _, addr := authtypes.KeyTestPubAddr()
+	_, _, addr := testdata.KeyTestPubAddr()
 	origCoins := sdk.Coins{sdk.NewInt64Coin(feeDenom, 1000), sdk.NewInt64Coin(stakeDenom, 100)}
 	bacc := authtypes.NewBaseAccountWithAddress(addr)
 
@@ -350,7 +349,7 @@ func TestGetVestedCoinsPeriodicVestingAcc(t *testing.T) {
 		types.Period{Length: int64(6 * 60 * 60), Amount: sdk.Coins{sdk.NewInt64Coin(feeDenom, 250), sdk.NewInt64Coin(stakeDenom, 25)}},
 	}
 
-	_, _, addr := authtypes.KeyTestPubAddr()
+	_, _, addr := testdata.KeyTestPubAddr()
 	origCoins := sdk.Coins{sdk.NewInt64Coin(feeDenom, 1000), sdk.NewInt64Coin(stakeDenom, 100)}
 	bacc := authtypes.NewBaseAccountWithAddress(addr)
 	pva := types.NewPeriodicVestingAccount(bacc, origCoins, now.Unix(), periods)
@@ -395,7 +394,7 @@ func TestGetVestingCoinsPeriodicVestingAcc(t *testing.T) {
 		types.Period{Length: int64(6 * 60 * 60), Amount: sdk.Coins{sdk.NewInt64Coin(feeDenom, 250), sdk.NewInt64Coin(stakeDenom, 25)}},
 	}
 
-	_, _, addr := authtypes.KeyTestPubAddr()
+	_, _, addr := testdata.KeyTestPubAddr()
 	origCoins := sdk.Coins{
 		sdk.NewInt64Coin(feeDenom, 1000), sdk.NewInt64Coin(stakeDenom, 100)}
 	bacc := authtypes.NewBaseAccountWithAddress(addr)
@@ -435,7 +434,7 @@ func TestSpendableCoinsPeriodicVestingAcc(t *testing.T) {
 		types.Period{Length: int64(6 * 60 * 60), Amount: sdk.Coins{sdk.NewInt64Coin(feeDenom, 250), sdk.NewInt64Coin(stakeDenom, 25)}},
 	}
 
-	_, _, addr := authtypes.KeyTestPubAddr()
+	_, _, addr := testdata.KeyTestPubAddr()
 	origCoins := sdk.Coins{
 		sdk.NewInt64Coin(feeDenom, 1000), sdk.NewInt64Coin(stakeDenom, 100)}
 	bacc := authtypes.NewBaseAccountWithAddress(addr)
@@ -470,7 +469,7 @@ func TestTrackDelegationPeriodicVestingAcc(t *testing.T) {
 		types.Period{Length: int64(6 * 60 * 60), Amount: sdk.Coins{sdk.NewInt64Coin(feeDenom, 250), sdk.NewInt64Coin(stakeDenom, 25)}},
 	}
 
-	_, _, addr := authtypes.KeyTestPubAddr()
+	_, _, addr := testdata.KeyTestPubAddr()
 	origCoins := sdk.Coins{sdk.NewInt64Coin(feeDenom, 1000), sdk.NewInt64Coin(stakeDenom, 100)}
 	bacc := authtypes.NewBaseAccountWithAddress(addr)
 
@@ -528,7 +527,7 @@ func TestTrackUndelegationPeriodicVestingAcc(t *testing.T) {
 		types.Period{Length: int64(6 * 60 * 60), Amount: sdk.Coins{sdk.NewInt64Coin(feeDenom, 250), sdk.NewInt64Coin(stakeDenom, 25)}},
 	}
 
-	_, _, addr := authtypes.KeyTestPubAddr()
+	_, _, addr := testdata.KeyTestPubAddr()
 	origCoins := sdk.Coins{sdk.NewInt64Coin(feeDenom, 1000), sdk.NewInt64Coin(stakeDenom, 100)}
 	bacc := authtypes.NewBaseAccountWithAddress(addr)
 
@@ -587,7 +586,7 @@ func TestGenesisAccountValidate(t *testing.T) {
 	baseVestingWithCoins := types.NewBaseVestingAccount(baseAcc, initialVesting, 100)
 	tests := []struct {
 		name   string
-		acc    authexported.GenesisAccount
+		acc    authtypes.GenesisAccount
 		expErr bool
 	}{
 		{
@@ -645,26 +644,6 @@ func TestGenesisAccountValidate(t *testing.T) {
 	}
 }
 
-func TestBaseVestingAccountJSON(t *testing.T) {
-	pubkey := secp256k1.GenPrivKey().PubKey()
-	addr := sdk.AccAddress(pubkey.Address())
-	coins := sdk.NewCoins(sdk.NewInt64Coin("test", 5))
-	baseAcc := authtypes.NewBaseAccount(addr, pubkey, 10, 50)
-
-	acc := types.NewBaseVestingAccount(baseAcc, coins, time.Now().Unix())
-
-	bz, err := json.Marshal(acc)
-	require.NoError(t, err)
-
-	bz1, err := acc.MarshalJSON()
-	require.NoError(t, err)
-	require.Equal(t, string(bz1), string(bz))
-
-	var a types.BaseVestingAccount
-	require.NoError(t, json.Unmarshal(bz, &a))
-	require.Equal(t, acc.String(), a.String())
-}
-
 func TestContinuousVestingAccountMarshal(t *testing.T) {
 	pubkey := secp256k1.GenPrivKey().PubKey()
 	addr := sdk.AccAddress(pubkey.Address())
@@ -674,38 +653,17 @@ func TestContinuousVestingAccountMarshal(t *testing.T) {
 	baseVesting := types.NewBaseVestingAccount(baseAcc, coins, time.Now().Unix())
 	acc := types.NewContinuousVestingAccountRaw(baseVesting, baseVesting.EndTime)
 
-	bz, err := appCodec.MarshalAccount(acc)
+	bz, err := app.AccountKeeper.MarshalAccount(acc)
 	require.Nil(t, err)
 
-	acc2, err := appCodec.UnmarshalAccount(bz)
+	acc2, err := app.AccountKeeper.UnmarshalAccount(bz)
 	require.Nil(t, err)
 	require.IsType(t, &types.ContinuousVestingAccount{}, acc2)
 	require.Equal(t, acc.String(), acc2.String())
 
 	// error on bad bytes
-	_, err = appCodec.UnmarshalAccount(bz[:len(bz)/2])
+	_, err = app.AccountKeeper.UnmarshalAccount(bz[:len(bz)/2])
 	require.NotNil(t, err)
-}
-
-func TestContinuousVestingAccountJSON(t *testing.T) {
-	pubkey := secp256k1.GenPrivKey().PubKey()
-	addr := sdk.AccAddress(pubkey.Address())
-	coins := sdk.NewCoins(sdk.NewInt64Coin("test", 5))
-	baseAcc := authtypes.NewBaseAccount(addr, pubkey, 10, 50)
-
-	baseVesting := types.NewBaseVestingAccount(baseAcc, coins, time.Now().Unix())
-	acc := types.NewContinuousVestingAccountRaw(baseVesting, baseVesting.EndTime)
-
-	bz, err := json.Marshal(acc)
-	require.NoError(t, err)
-
-	bz1, err := acc.MarshalJSON()
-	require.NoError(t, err)
-	require.Equal(t, string(bz1), string(bz))
-
-	var a types.ContinuousVestingAccount
-	require.NoError(t, json.Unmarshal(bz, &a))
-	require.Equal(t, acc.String(), a.String())
 }
 
 func TestPeriodicVestingAccountMarshal(t *testing.T) {
@@ -716,37 +674,17 @@ func TestPeriodicVestingAccountMarshal(t *testing.T) {
 
 	acc := types.NewPeriodicVestingAccount(baseAcc, coins, time.Now().Unix(), types.Periods{types.Period{3600, coins}})
 
-	bz, err := appCodec.MarshalAccount(acc)
+	bz, err := app.AccountKeeper.MarshalAccount(acc)
 	require.Nil(t, err)
 
-	acc2, err := appCodec.UnmarshalAccount(bz)
+	acc2, err := app.AccountKeeper.UnmarshalAccount(bz)
 	require.Nil(t, err)
 	require.IsType(t, &types.PeriodicVestingAccount{}, acc2)
 	require.Equal(t, acc.String(), acc2.String())
 
 	// error on bad bytes
-	_, err = appCodec.UnmarshalAccount(bz[:len(bz)/2])
+	_, err = app.AccountKeeper.UnmarshalAccount(bz[:len(bz)/2])
 	require.NotNil(t, err)
-}
-
-func TestPeriodicVestingAccountJSON(t *testing.T) {
-	pubkey := secp256k1.GenPrivKey().PubKey()
-	addr := sdk.AccAddress(pubkey.Address())
-	coins := sdk.NewCoins(sdk.NewInt64Coin("test", 5))
-	baseAcc := authtypes.NewBaseAccount(addr, pubkey, 10, 50)
-
-	acc := types.NewPeriodicVestingAccount(baseAcc, coins, time.Now().Unix(), types.Periods{types.Period{3600, coins}})
-
-	bz, err := json.Marshal(acc)
-	require.NoError(t, err)
-
-	bz1, err := acc.MarshalJSON()
-	require.NoError(t, err)
-	require.Equal(t, string(bz1), string(bz))
-
-	var a types.PeriodicVestingAccount
-	require.NoError(t, json.Unmarshal(bz, &a))
-	require.Equal(t, acc.String(), a.String())
 }
 
 func TestDelayedVestingAccountMarshal(t *testing.T) {
@@ -757,35 +695,15 @@ func TestDelayedVestingAccountMarshal(t *testing.T) {
 
 	acc := types.NewDelayedVestingAccount(baseAcc, coins, time.Now().Unix())
 
-	bz, err := appCodec.MarshalAccount(acc)
+	bz, err := app.AccountKeeper.MarshalAccount(acc)
 	require.Nil(t, err)
 
-	acc2, err := appCodec.UnmarshalAccount(bz)
+	acc2, err := app.AccountKeeper.UnmarshalAccount(bz)
 	require.Nil(t, err)
 	require.IsType(t, &types.DelayedVestingAccount{}, acc2)
 	require.Equal(t, acc.String(), acc2.String())
 
 	// error on bad bytes
-	_, err = appCodec.UnmarshalAccount(bz[:len(bz)/2])
+	_, err = app.AccountKeeper.UnmarshalAccount(bz[:len(bz)/2])
 	require.NotNil(t, err)
-}
-
-func TestDelayedVestingAccountJSON(t *testing.T) {
-	pubkey := secp256k1.GenPrivKey().PubKey()
-	addr := sdk.AccAddress(pubkey.Address())
-	coins := sdk.NewCoins(sdk.NewInt64Coin("test", 5))
-	baseAcc := authtypes.NewBaseAccount(addr, pubkey, 10, 50)
-
-	acc := types.NewDelayedVestingAccount(baseAcc, coins, time.Now().Unix())
-
-	bz, err := json.Marshal(acc)
-	require.NoError(t, err)
-
-	bz1, err := acc.MarshalJSON()
-	require.NoError(t, err)
-	require.Equal(t, string(bz1), string(bz))
-
-	var a types.DelayedVestingAccount
-	require.NoError(t, json.Unmarshal(bz, &a))
-	require.Equal(t, acc.String(), a.String())
 }

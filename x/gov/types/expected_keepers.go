@@ -2,8 +2,8 @@ package types
 
 import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	authexported "github.com/cosmos/cosmos-sdk/x/auth/exported"
-	stakingexported "github.com/cosmos/cosmos-sdk/x/staking/exported"
+	"github.com/cosmos/cosmos-sdk/x/auth/types"
+	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 )
 
 // ParamSubspace defines the expected Subspace interface for parameters (noalias)
@@ -16,25 +16,25 @@ type ParamSubspace interface {
 type StakingKeeper interface {
 	// iterate through bonded validators by operator address, execute func for each validator
 	IterateBondedValidatorsByPower(
-		sdk.Context, func(index int64, validator stakingexported.ValidatorI) (stop bool),
+		sdk.Context, func(index int64, validator stakingtypes.ValidatorI) (stop bool),
 	)
 
 	TotalBondedTokens(sdk.Context) sdk.Int // total bonded tokens within the validator set
 	IterateDelegations(
 		ctx sdk.Context, delegator sdk.AccAddress,
-		fn func(index int64, delegation stakingexported.DelegationI) (stop bool),
+		fn func(index int64, delegation stakingtypes.DelegationI) (stop bool),
 	)
 }
 
 // AccountKeeper defines the expected account keeper (noalias)
 type AccountKeeper interface {
-	GetAccount(ctx sdk.Context, addr sdk.AccAddress) authexported.Account
+	GetAccount(ctx sdk.Context, addr sdk.AccAddress) types.AccountI
 
 	GetModuleAddress(name string) sdk.AccAddress
-	GetModuleAccount(ctx sdk.Context, name string) authexported.ModuleAccountI
+	GetModuleAccount(ctx sdk.Context, name string) types.ModuleAccountI
 
 	// TODO remove with genesis 2-phases refactor https://github.com/cosmos/cosmos-sdk/issues/2862
-	SetModuleAccount(sdk.Context, authexported.ModuleAccountI)
+	SetModuleAccount(sdk.Context, types.ModuleAccountI)
 }
 
 // BankKeeper defines the expected interface needed to retrieve account balances.

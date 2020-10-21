@@ -7,98 +7,107 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/gogo/protobuf/proto"
 	"github.com/tendermint/tendermint/crypto"
-	yaml "gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v2"
 
+	"github.com/cosmos/cosmos-sdk/codec"
+	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/x/auth/exported"
 )
 
 var (
-	_ exported.Account        = (*BaseAccount)(nil)
-	_ exported.GenesisAccount = (*BaseAccount)(nil)
-	_ exported.GenesisAccount = (*ModuleAccount)(nil)
-	_ exported.ModuleAccountI = (*ModuleAccount)(nil)
+	_ AccountI                           = (*BaseAccount)(nil)
+	_ GenesisAccount                     = (*BaseAccount)(nil)
+	_ codectypes.UnpackInterfacesMessage = (*BaseAccount)(nil)
+	_ GenesisAccount                     = (*ModuleAccount)(nil)
+	_ ModuleAccountI                     = (*ModuleAccount)(nil)
 )
 
 // NewBaseAccount creates a new BaseAccount object
+//nolint:interfacer
 func NewBaseAccount(address sdk.AccAddress, pubKey crypto.PubKey, accountNumber, sequence uint64) *BaseAccount {
 	acc := &BaseAccount{
-		Address:       address,
+		Address:       address.String(),
 		AccountNumber: accountNumber,
 		Sequence:      sequence,
 	}
 
-	acc.SetPubKey(pubKey)
+	err := acc.SetPubKey(pubKey)
+	if err != nil {
+		panic(err)
+	}
 
 	return acc
 }
 
 // ProtoBaseAccount - a prototype function for BaseAccount
-func ProtoBaseAccount() exported.Account {
+func ProtoBaseAccount() AccountI {
 	return &BaseAccount{}
 }
 
 // NewBaseAccountWithAddress - returns a new base account with a given address
 func NewBaseAccountWithAddress(addr sdk.AccAddress) *BaseAccount {
 	return &BaseAccount{
-		Address: addr,
+		Address: addr.String(),
 	}
 }
 
-// GetAddress - Implements sdk.Account.
+// GetAddress - Implements sdk.AccountI.
 func (acc BaseAccount) GetAddress() sdk.AccAddress {
-	return acc.Address
+	addr, _ := sdk.AccAddressFromBech32(acc.Address)
+	return addr
 }
 
-// SetAddress - Implements sdk.Account.
+// SetAddress - Implements sdk.AccountI.
 func (acc *BaseAccount) SetAddress(addr sdk.AccAddress) error {
 	if len(acc.Address) != 0 {
 		return errors.New("cannot override BaseAccount address")
 	}
 
-	acc.Address = addr
+	acc.Address = addr.String()
 	return nil
 }
 
-// GetPubKey - Implements sdk.Account.
+// GetPubKey - Implements sdk.AccountI.
 func (acc BaseAccount) GetPubKey() (pk crypto.PubKey) {
-	if len(acc.PubKey) == 0 {
+	if acc.PubKey == nil {
 		return nil
 	}
-
-	amino.MustUnmarshalBinaryBare(acc.PubKey, &pk)
-	return pk
+	content, ok := acc.PubKey.GetCachedValue().(crypto.PubKey)
+	if !ok {
+		return nil
+	}
+	return content
 }
 
-// SetPubKey - Implements sdk.Account.
+// SetPubKey - Implements sdk.AccountI.
 func (acc *BaseAccount) SetPubKey(pubKey crypto.PubKey) error {
-	if pubKey == nil {
-		acc.PubKey = nil
-	} else {
-		acc.PubKey = pubKey.Bytes()
+	any, err := codectypes.PackAny(pubKey)
+	if err != nil {
+		return err
 	}
-
+	acc.PubKey = any
 	return nil
 }
 
-// GetAccountNumber - Implements Account
+// GetAccountNumber - Implements AccountI
 func (acc BaseAccount) GetAccountNumber() uint64 {
 	return acc.AccountNumber
 }
 
-// SetAccountNumber - Implements Account
+// SetAccountNumber - Implements AccountI
 func (acc *BaseAccount) SetAccountNumber(accNumber uint64) error {
 	acc.AccountNumber = accNumber
 	return nil
 }
 
-// GetSequence - Implements sdk.Account.
+// GetSequence - Implements sdk.AccountI.
 func (acc BaseAccount) GetSequence() uint64 {
 	return acc.Sequence
 }
 
-// SetSequence - Implements sdk.Account.
+// SetSequence - Implements sdk.AccountI.
 func (acc *BaseAccount) SetSequence(seq uint64) error {
 	acc.Sequence = seq
 	return nil
@@ -106,8 +115,16 @@ func (acc *BaseAccount) SetSequence(seq uint64) error {
 
 // Validate checks for errors on the account fields
 func (acc BaseAccount) Validate() error {
-	if len(acc.PubKey) != 0 && acc.Address != nil &&
-		!bytes.Equal(acc.GetPubKey().Address().Bytes(), acc.Address.Bytes()) {
+	if acc.Address == "" || acc.PubKey == nil {
+		return nil
+	}
+
+	accAddr, err := sdk.AccAddressFromBech32(acc.Address)
+	if err != nil {
+		return err
+	}
+
+	if !bytes.Equal(acc.GetPubKey().Address().Bytes(), accAddr.Bytes()) {
 		return errors.New("account address and pubkey address do not match")
 	}
 
@@ -119,36 +136,22 @@ func (acc BaseAccount) String() string {
 	return out.(string)
 }
 
-type baseAccountPretty struct {
-	Address       sdk.AccAddress `json:"address" yaml:"address"`
-	PubKey        string         `json:"public_key" yaml:"public_key"`
-	AccountNumber uint64         `json:"account_number" yaml:"account_number"`
-	Sequence      uint64         `json:"sequence" yaml:"sequence"`
-}
-
 // MarshalYAML returns the YAML representation of an account.
 func (acc BaseAccount) MarshalYAML() (interface{}, error) {
-	alias := baseAccountPretty{
-		Address:       acc.Address,
-		AccountNumber: acc.AccountNumber,
-		Sequence:      acc.Sequence,
-	}
-
-	if acc.PubKey != nil {
-		pks, err := sdk.Bech32ifyPubKey(sdk.Bech32PubKeyTypeAccPub, acc.GetPubKey())
-		if err != nil {
-			return nil, err
-		}
-
-		alias.PubKey = pks
-	}
-
-	bz, err := yaml.Marshal(alias)
+	bz, err := codec.MarshalYAML(codec.NewProtoCodec(codectypes.NewInterfaceRegistry()), &acc)
 	if err != nil {
 		return nil, err
 	}
-
 	return string(bz), err
+}
+
+// UnpackInterfaces implements UnpackInterfacesMessage.UnpackInterfaces
+func (acc BaseAccount) UnpackInterfaces(unpacker codectypes.AnyUnpacker) error {
+	if acc.PubKey == nil {
+		return nil
+	}
+	var pubKey crypto.PubKey
+	return unpacker.UnpackAny(acc.PubKey, &pubKey)
 }
 
 // NewModuleAddress creates an AccAddress from the hash of the module's name
@@ -205,12 +208,12 @@ func (ma ModuleAccount) GetPermissions() []string {
 	return ma.Permissions
 }
 
-// SetPubKey - Implements Account
+// SetPubKey - Implements AccountI
 func (ma ModuleAccount) SetPubKey(pubKey crypto.PubKey) error {
 	return fmt.Errorf("not supported for module accounts")
 }
 
-// SetSequence - Implements Account
+// SetSequence - Implements AccountI
 func (ma ModuleAccount) SetSequence(seq uint64) error {
 	return fmt.Errorf("not supported for module accounts")
 }
@@ -221,7 +224,7 @@ func (ma ModuleAccount) Validate() error {
 		return errors.New("module account name cannot be blank")
 	}
 
-	if !ma.Address.Equals(sdk.AccAddress(crypto.AddressHash([]byte(ma.Name)))) {
+	if ma.Address != sdk.AccAddress(crypto.AddressHash([]byte(ma.Name))).String() {
 		return fmt.Errorf("address %s cannot be derived from the module name '%s'", ma.Address, ma.Name)
 	}
 
@@ -244,8 +247,13 @@ func (ma ModuleAccount) String() string {
 
 // MarshalYAML returns the YAML representation of a ModuleAccount.
 func (ma ModuleAccount) MarshalYAML() (interface{}, error) {
+	accAddr, err := sdk.AccAddressFromBech32(ma.Address)
+	if err != nil {
+		return nil, err
+	}
+
 	bs, err := yaml.Marshal(moduleAccountPretty{
-		Address:       ma.Address,
+		Address:       accAddr,
 		PubKey:        "",
 		AccountNumber: ma.AccountNumber,
 		Sequence:      ma.Sequence,
@@ -262,8 +270,13 @@ func (ma ModuleAccount) MarshalYAML() (interface{}, error) {
 
 // MarshalJSON returns the JSON representation of a ModuleAccount.
 func (ma ModuleAccount) MarshalJSON() ([]byte, error) {
+	accAddr, err := sdk.AccAddressFromBech32(ma.Address)
+	if err != nil {
+		return nil, err
+	}
+
 	return json.Marshal(moduleAccountPretty{
-		Address:       ma.Address,
+		Address:       accAddr,
 		PubKey:        "",
 		AccountNumber: ma.AccountNumber,
 		Sequence:      ma.Sequence,
@@ -284,4 +297,61 @@ func (ma *ModuleAccount) UnmarshalJSON(bz []byte) error {
 	ma.Permissions = alias.Permissions
 
 	return nil
+}
+
+// AccountI is an interface used to store coins at a given address within state.
+// It presumes a notion of sequence numbers for replay protection,
+// a notion of account numbers for replay protection for previously pruned accounts,
+// and a pubkey for authentication purposes.
+//
+// Many complex conditions can be used in the concrete struct which implements AccountI.
+type AccountI interface {
+	proto.Message
+
+	GetAddress() sdk.AccAddress
+	SetAddress(sdk.AccAddress) error // errors if already set.
+
+	GetPubKey() crypto.PubKey // can return nil.
+	SetPubKey(crypto.PubKey) error
+
+	GetAccountNumber() uint64
+	SetAccountNumber(uint64) error
+
+	GetSequence() uint64
+	SetSequence(uint64) error
+
+	// Ensure that account implements stringer
+	String() string
+}
+
+// ModuleAccountI defines an account interface for modules that hold tokens in
+// an escrow.
+type ModuleAccountI interface {
+	AccountI
+
+	GetName() string
+	GetPermissions() []string
+	HasPermission(string) bool
+}
+
+// GenesisAccounts defines a slice of GenesisAccount objects
+type GenesisAccounts []GenesisAccount
+
+// Contains returns true if the given address exists in a slice of GenesisAccount
+// objects.
+func (ga GenesisAccounts) Contains(addr sdk.Address) bool {
+	for _, acc := range ga {
+		if acc.GetAddress().Equals(addr) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// GenesisAccount defines a genesis account that embeds an AccountI with validation capabilities.
+type GenesisAccount interface {
+	AccountI
+
+	Validate() error
 }

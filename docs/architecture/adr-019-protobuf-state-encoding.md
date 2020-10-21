@@ -5,6 +5,7 @@
 - 2020 Feb 15: Initial Draft
 - 2020 Feb 24: Updates to handle messages with interface fields
 - 2020 Apr 27: Convert usages of `oneof` for interfaces to `Any`
+- 2020 May 15: Describe `cosmos_proto` extensions and amino compatibility
 
 ## Status
 
@@ -176,6 +177,14 @@ type InterfaceRegistry interface {
 In addition to serving as a whitelist, `InterfaceRegistry` can also serve
 to communicate the list of concrete types that satisfy an interface to clients.
 
+In .proto files:
+* fields which accept interfaces should be annotated with `cosmos_proto.accepts_interface`
+using the same full-qualified name passed as `protoName` to `InterfaceRegistry.RegisterInterface`
+* interface implementations should be annotated with `cosmos_proto.implements_interface`
+using the same full-qualified name passed as `protoName` to `InterfaceRegistry.RegisterInterface`
+
+In the future, `protoName`, `cosmos_proto.accepts_interface`, `cosmos_proto.implements_interface`
+may be used via code generation, reflection &/or static linting.
 
 The same struct that implements `InterfaceRegistry` will also implement an
 interface `InterfaceUnpacker` to be used for unpacking `Any`s:
@@ -194,7 +203,7 @@ type InterfaceUnpacker interface {
 ```
 
 Note that `InterfaceRegistry` usage does not deviate from standard protobuf
-usage of `Any`, it just introduces a security and introspection layer for 
+usage of `Any`, it just introduces a security and introspection layer for
 golang usage.
 
 `InterfaceRegistry` will be a member of `ProtoCodec` and `HybridCodec` as
@@ -261,6 +270,7 @@ interfaces before they're needed.
 To implement the `UnpackInterfaces` phase of deserialization which unpacks
 interfaces wrapped in `Any` before they're needed, we create an interface
 that `sdk.Msg`s and other types can implement:
+
 ```go
 type UnpackInterfacesMessage interface {
   UnpackInterfaces(InterfaceUnpacker) error
@@ -282,7 +292,7 @@ correct interface type.
 This has the added benefit that unmarshaling of `Any` values only happens once
 during initial deserialization rather than every time the value is read. Also,
 when `Any` values are first packed (for instance in a call to
-`NewMsgSubmitEvidence`), the original interface value is cached so that 
+`NewMsgSubmitEvidence`), the original interface value is cached so that
 unmarshaling isn't needed to read it again.
 
 `MsgSubmitEvidence` could implement `UnpackInterfaces`, plus a convenience getter
@@ -298,6 +308,21 @@ func (msg MsgSubmitEvidence) GetEvidence() eviexported.Evidence {
   return msg.Evidence.GetCachedValue().(eviexported.Evidence)
 }
 ```
+
+### Amino Compatibility
+
+Our custom implementation of `Any` can be used transparently with Amino if used
+with the proper codec instance. What this means is that interfaces packed within
+`Any`s will be amino marshaled like regular Amino interfaces (assuming they
+have been registered properly with Amino).
+
+In order for this functionality to work:
+
+- **all legacy code must use `*codec.LegacyAmino` instead of `*amino.Codec` which is
+  now a wrapper which properly handles `Any`**
+- **all new code should use `Marshaler` which is compatible with both amino and
+  protobuf**
+- Also, before v0.39, `codec.LegacyAmino` will be renamed to `codec.LegacyAmino`.
 
 ### Why Wasn't X Chosen Instead
 
@@ -342,7 +367,7 @@ seamless.
 
 - Learning curve required to understand and implement Protobuf messages.
 - Slightly larger message size due to use of `Any`, although this could be offset
-by a compression layer in the future
+  by a compression layer in the future
 
 ### Neutral
 
@@ -350,3 +375,4 @@ by a compression layer in the future
 
 1. https://github.com/cosmos/cosmos-sdk/issues/4977
 2. https://github.com/cosmos/cosmos-sdk/issues/5444
+

@@ -5,27 +5,36 @@ import (
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 )
 
-var _ sdk.Msg = MsgSend{}
+// bank message types
+const (
+	TypeMsgSend      = "send"
+	TypeMsgMultiSend = "multisend"
+)
 
-// NewMsgSend - construct arbitrary multi-in, multi-out send msg.
-func NewMsgSend(fromAddr, toAddr sdk.AccAddress, amount sdk.Coins) MsgSend {
-	return MsgSend{FromAddress: fromAddr, ToAddress: toAddr, Amount: amount}
+var _ sdk.Msg = &MsgSend{}
+
+// NewMsgSend - construct a msg to send coins from one account to another.
+//nolint:interfacer
+func NewMsgSend(fromAddr, toAddr sdk.AccAddress, amount sdk.Coins) *MsgSend {
+	return &MsgSend{FromAddress: fromAddr.String(), ToAddress: toAddr.String(), Amount: amount}
 }
 
 // Route Implements Msg.
 func (msg MsgSend) Route() string { return RouterKey }
 
 // Type Implements Msg.
-func (msg MsgSend) Type() string { return "send" }
+func (msg MsgSend) Type() string { return TypeMsgSend }
 
 // ValidateBasic Implements Msg.
 func (msg MsgSend) ValidateBasic() error {
-	if msg.FromAddress.Empty() {
-		return sdkerrors.Wrap(sdkerrors.ErrInvalidAddress, "missing sender address")
+	_, err := sdk.AccAddressFromBech32(msg.FromAddress)
+	if err != nil {
+		return sdkerrors.Wrapf(sdkerrors.ErrInvalidAddress, "Invalid sender address (%s)", err)
 	}
 
-	if msg.ToAddress.Empty() {
-		return sdkerrors.Wrap(sdkerrors.ErrInvalidAddress, "missing recipient address")
+	_, err = sdk.AccAddressFromBech32(msg.ToAddress)
+	if err != nil {
+		return sdkerrors.Wrapf(sdkerrors.ErrInvalidAddress, "Invalid recipient address (%s)", err)
 	}
 
 	if !msg.Amount.IsValid() {
@@ -41,26 +50,30 @@ func (msg MsgSend) ValidateBasic() error {
 
 // GetSignBytes Implements Msg.
 func (msg MsgSend) GetSignBytes() []byte {
-	return sdk.MustSortJSON(ModuleCdc.MustMarshalJSON(msg))
+	return sdk.MustSortJSON(ModuleCdc.MustMarshalJSON(&msg))
 }
 
 // GetSigners Implements Msg.
 func (msg MsgSend) GetSigners() []sdk.AccAddress {
-	return []sdk.AccAddress{msg.FromAddress}
+	from, err := sdk.AccAddressFromBech32(msg.FromAddress)
+	if err != nil {
+		panic(err)
+	}
+	return []sdk.AccAddress{from}
 }
 
-var _ sdk.Msg = MsgMultiSend{}
+var _ sdk.Msg = &MsgMultiSend{}
 
 // NewMsgMultiSend - construct arbitrary multi-in, multi-out send msg.
-func NewMsgMultiSend(in []Input, out []Output) MsgMultiSend {
-	return MsgMultiSend{Inputs: in, Outputs: out}
+func NewMsgMultiSend(in []Input, out []Output) *MsgMultiSend {
+	return &MsgMultiSend{Inputs: in, Outputs: out}
 }
 
 // Route Implements Msg
 func (msg MsgMultiSend) Route() string { return RouterKey }
 
 // Type Implements Msg
-func (msg MsgMultiSend) Type() string { return "multisend" }
+func (msg MsgMultiSend) Type() string { return TypeMsgMultiSend }
 
 // ValidateBasic Implements Msg.
 func (msg MsgMultiSend) ValidateBasic() error {
@@ -79,14 +92,15 @@ func (msg MsgMultiSend) ValidateBasic() error {
 
 // GetSignBytes Implements Msg.
 func (msg MsgMultiSend) GetSignBytes() []byte {
-	return sdk.MustSortJSON(ModuleCdc.MustMarshalJSON(msg))
+	return sdk.MustSortJSON(ModuleCdc.MustMarshalJSON(&msg))
 }
 
 // GetSigners Implements Msg.
 func (msg MsgMultiSend) GetSigners() []sdk.AccAddress {
 	addrs := make([]sdk.AccAddress, len(msg.Inputs))
 	for i, in := range msg.Inputs {
-		addrs[i] = in.Address
+		addr, _ := sdk.AccAddressFromBech32(in.Address)
+		addrs[i] = addr
 	}
 
 	return addrs
@@ -94,8 +108,9 @@ func (msg MsgMultiSend) GetSigners() []sdk.AccAddress {
 
 // ValidateBasic - validate transaction input
 func (in Input) ValidateBasic() error {
-	if len(in.Address) == 0 {
-		return sdkerrors.Wrap(sdkerrors.ErrInvalidAddress, "input address missing")
+	_, err := sdk.AccAddressFromBech32(in.Address)
+	if err != nil {
+		return err
 	}
 
 	if !in.Coins.IsValid() {
@@ -110,17 +125,19 @@ func (in Input) ValidateBasic() error {
 }
 
 // NewInput - create a transaction input, used with MsgMultiSend
+//nolint:interfacer
 func NewInput(addr sdk.AccAddress, coins sdk.Coins) Input {
 	return Input{
-		Address: addr,
+		Address: addr.String(),
 		Coins:   coins,
 	}
 }
 
 // ValidateBasic - validate transaction output
 func (out Output) ValidateBasic() error {
-	if len(out.Address) == 0 {
-		return sdkerrors.Wrap(sdkerrors.ErrInvalidAddress, "output address missing")
+	_, err := sdk.AccAddressFromBech32(out.Address)
+	if err != nil {
+		return sdkerrors.Wrapf(sdkerrors.ErrInvalidAddress, "Invalid output address (%s)", err)
 	}
 
 	if !out.Coins.IsValid() {
@@ -135,9 +152,10 @@ func (out Output) ValidateBasic() error {
 }
 
 // NewOutput - create a transaction output, used with MsgMultiSend
+//nolint:interfacer
 func NewOutput(addr sdk.AccAddress, coins sdk.Coins) Output {
 	return Output{
-		Address: addr,
+		Address: addr.String(),
 		Coins:   coins,
 	}
 }

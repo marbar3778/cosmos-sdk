@@ -109,12 +109,12 @@ func (q Querier) QueryBalance(ctx context.Context, params *types.QueryBalancePar
 ### Custom Query Registration and Routing
 
 Query server implementations as above would be registered with `AppModule`s using
-a new method `RegisterQueryServer(grpc.Server)` which could be implemented simply
+a new method `RegisterQueryService(grpc.Server)` which could be implemented simply
 as below:
 
 ```go
 // x/bank/module.go
-func (am AppModule) RegisterQueryServer(server grpc.Server) {
+func (am AppModule) RegisterQueryService(server grpc.Server) {
 	types.RegisterQueryServer(server, keeper.Querier{am.keeper})
 }
 ```
@@ -211,14 +211,14 @@ we have tweaked the grpc codegen to use an interface rather than concrete type
 for the generated client struct. This allows us to also reuse the GRPC infrastructure
 for ABCI client queries.
 
-`CLIContext` will receive a new method `QueryConn` that returns a `ClientConn`
+1Context` will receive a new method `QueryConn` that returns a `ClientConn`
 that routes calls to ABCI queries
 
 Clients (such as CLI methods) will then be able to call query methods like this:
 
 ```go
-cliCtx := context.NewCLIContext()
-queryClient := types.NewQueryClient(cliCtx.QueryConn())
+clientCtx := client.NewContext()
+queryClient := types.NewQueryClient(clientCtx.QueryConn())
 params := &types.QueryBalanceParams{addr, denom}
 result, err := queryClient.QueryBalance(gocontext.Background(), params)
 ```

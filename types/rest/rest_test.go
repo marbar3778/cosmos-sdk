@@ -13,11 +13,13 @@ import (
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
 	"github.com/tendermint/tendermint/crypto"
-	"github.com/tendermint/tendermint/crypto/secp256k1"
 
-	"github.com/cosmos/cosmos-sdk/client/context"
+	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/client/flags"
 	"github.com/cosmos/cosmos-sdk/codec"
+	cryptocodec "github.com/cosmos/cosmos-sdk/crypto/codec"
+	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
+	simappparams "github.com/cosmos/cosmos-sdk/simapp/params"
 	"github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/rest"
 )
@@ -147,25 +149,25 @@ func TestParseQueryHeight(t *testing.T) {
 		name           string
 		req            *http.Request
 		w              http.ResponseWriter
-		cliCtx         context.CLIContext
+		clientCtx      client.Context
 		expectedHeight int64
 		expectedOk     bool
 	}{
-		{"no height", req0, httptest.NewRecorder(), context.CLIContext{}, emptyHeight, true},
-		{"height", req1, httptest.NewRecorder(), context.CLIContext{}, height, true},
-		{"invalid height", req2, httptest.NewRecorder(), context.CLIContext{}, emptyHeight, false},
-		{"negative height", req3, httptest.NewRecorder(), context.CLIContext{}, emptyHeight, false},
+		{"no height", req0, httptest.NewRecorder(), client.Context{}, emptyHeight, true},
+		{"height", req1, httptest.NewRecorder(), client.Context{}, height, true},
+		{"invalid height", req2, httptest.NewRecorder(), client.Context{}, emptyHeight, false},
+		{"negative height", req3, httptest.NewRecorder(), client.Context{}, emptyHeight, false},
 	}
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			cliCtx, ok := rest.ParseQueryHeightOrReturnBadRequest(tt.w, tt.cliCtx, tt.req)
+			clientCtx, ok := rest.ParseQueryHeightOrReturnBadRequest(tt.w, tt.clientCtx, tt.req)
 			if tt.expectedOk {
 				require.True(t, ok)
-				require.Equal(t, tt.expectedHeight, cliCtx.Height)
+				require.Equal(t, tt.expectedHeight, clientCtx.Height)
 			} else {
 				require.False(t, ok)
-				require.Empty(t, tt.expectedHeight, cliCtx.Height)
+				require.Empty(t, tt.expectedHeight, clientCtx.Height)
 			}
 		})
 	}
@@ -187,7 +189,7 @@ func TestProcessPostResponse(t *testing.T) {
 
 	// setup
 	viper.Set(flags.FlagOffline, true)
-	ctx := context.NewCLIContext()
+	ctx := client.Context{}
 	height := int64(194423)
 
 	privKey := secp256k1.GenPrivKey()
@@ -198,20 +200,17 @@ func TestProcessPostResponse(t *testing.T) {
 	sequence := uint64(32)
 
 	acc := mockAccount{addr, coins, pubKey, accNumber, sequence}
-	cdc := codec.New()
-	codec.RegisterCrypto(cdc)
+	cdc := codec.NewLegacyAmino()
+	cryptocodec.RegisterCrypto(cdc)
 	cdc.RegisterConcrete(&mockAccount{}, "cosmos-sdk/mockAccount", nil)
-	ctx = ctx.WithCodec(cdc)
+	ctx = ctx.WithLegacyAmino(cdc)
 
 	// setup expected results
-	jsonNoIndent, err := ctx.Codec.MarshalJSON(acc)
+	jsonNoIndent, err := ctx.LegacyAmino.MarshalJSON(acc)
 	require.Nil(t, err)
 
 	respNoIndent := rest.NewResponseWithHeight(height, jsonNoIndent)
-	expectedNoIndent, err := ctx.Codec.MarshalJSON(respNoIndent)
-	require.Nil(t, err)
-
-	expectedWithIndent, err := codec.MarshalIndentFromJSON(expectedNoIndent)
+	expectedNoIndent, err := ctx.LegacyAmino.MarshalJSON(respNoIndent)
 	require.Nil(t, err)
 
 	// check that negative height writes an error
@@ -222,10 +221,7 @@ func TestProcessPostResponse(t *testing.T) {
 
 	// check that height returns expected response
 	ctx = ctx.WithHeight(height)
-	runPostProcessResponse(t, ctx, acc, expectedNoIndent, false)
-
-	// check height with indent
-	runPostProcessResponse(t, ctx, acc, expectedWithIndent, true)
+	runPostProcessResponse(t, ctx, acc, expectedNoIndent)
 }
 
 func TestReadRESTReq(t *testing.T) {
@@ -236,7 +232,7 @@ func TestReadRESTReq(t *testing.T) {
 	var br rest.BaseReq
 
 	// test OK
-	rest.ReadRESTReq(w, req, codec.New(), &br)
+	rest.ReadRESTReq(w, req, codec.NewLegacyAmino(), &br)
 	res := w.Result() //nolint:bodyclose
 	t.Cleanup(func() { res.Body.Close() })
 	require.Equal(t, rest.BaseReq{ChainID: "alessio", Memo: "text"}, br)
@@ -247,7 +243,7 @@ func TestReadRESTReq(t *testing.T) {
 	req = &http.Request{Body: reqBody}
 	br = rest.BaseReq{}
 	w = httptest.NewRecorder()
-	rest.ReadRESTReq(w, req, codec.New(), &br)
+	rest.ReadRESTReq(w, req, codec.NewLegacyAmino(), &br)
 	require.Equal(t, br, br)
 	res = w.Result() //nolint:bodyclose
 	t.Cleanup(func() { res.Body.Close() })
@@ -257,7 +253,7 @@ func TestReadRESTReq(t *testing.T) {
 func TestWriteSimulationResponse(t *testing.T) {
 	t.Parallel()
 	w := httptest.NewRecorder()
-	rest.WriteSimulationResponse(w, codec.New(), 10)
+	rest.WriteSimulationResponse(w, codec.NewLegacyAmino(), 10)
 	res := w.Result() //nolint:bodyclose
 	t.Cleanup(func() { res.Body.Close() })
 	require.Equal(t, http.StatusOK, res.StatusCode)
@@ -311,12 +307,15 @@ func TestParseQueryParamBool(t *testing.T) {
 func TestPostProcessResponseBare(t *testing.T) {
 	t.Parallel()
 
+	encodingConfig := simappparams.MakeEncodingConfig()
+	clientCtx := client.Context{}.
+		WithTxConfig(encodingConfig.TxConfig).
+		WithLegacyAmino(encodingConfig.Amino) // amino used intentionally here
 	// write bytes
-	ctx := context.CLIContext{}
 	w := httptest.NewRecorder()
 	bs := []byte("text string")
 
-	rest.PostProcessResponseBare(w, ctx, bs)
+	rest.PostProcessResponseBare(w, clientCtx, bs)
 
 	res := w.Result() //nolint:bodyclose
 	require.Equal(t, http.StatusOK, res.StatusCode)
@@ -328,14 +327,13 @@ func TestPostProcessResponseBare(t *testing.T) {
 	require.Equal(t, "text string", string(got))
 
 	// write struct and indent response
-	ctx = context.CLIContext{Indent: true}.WithCodec(codec.New())
 	w = httptest.NewRecorder()
 	data := struct {
 		X int    `json:"x"`
 		S string `json:"s"`
 	}{X: 10, S: "test"}
 
-	rest.PostProcessResponseBare(w, ctx, data)
+	rest.PostProcessResponseBare(w, clientCtx, data)
 
 	res = w.Result() //nolint:bodyclose
 	require.Equal(t, http.StatusOK, res.StatusCode)
@@ -344,20 +342,16 @@ func TestPostProcessResponseBare(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Cleanup(func() { res.Body.Close() })
-	require.Equal(t, `{
-  "s": "test",
-  "x": "10"
-}`, string(got))
+	require.Equal(t, "{\"x\":\"10\",\"s\":\"test\"}", string(got))
 
 	// write struct, don't indent response
-	ctx = context.CLIContext{Indent: false}.WithCodec(codec.New())
 	w = httptest.NewRecorder()
 	data = struct {
 		X int    `json:"x"`
 		S string `json:"s"`
 	}{X: 10, S: "test"}
 
-	rest.PostProcessResponseBare(w, ctx, data)
+	rest.PostProcessResponseBare(w, clientCtx, data)
 
 	res = w.Result() //nolint:bodyclose
 	require.Equal(t, http.StatusOK, res.StatusCode)
@@ -369,11 +363,10 @@ func TestPostProcessResponseBare(t *testing.T) {
 	require.Equal(t, `{"x":"10","s":"test"}`, string(got))
 
 	// test marshalling failure
-	ctx = context.CLIContext{Indent: false}.WithCodec(codec.New())
 	w = httptest.NewRecorder()
 	data2 := badJSONMarshaller{}
 
-	rest.PostProcessResponseBare(w, ctx, data2)
+	rest.PostProcessResponseBare(w, clientCtx, data2)
 
 	res = w.Result() //nolint:bodyclose
 	require.Equal(t, http.StatusInternalServerError, res.StatusCode)
@@ -395,11 +388,7 @@ func (badJSONMarshaller) MarshalJSON() ([]byte, error) {
 // asserts that ResponseRecorder returns the expected code and body
 // runs PostProcessResponse on the objects regular interface and on
 // the marshalled struct.
-func runPostProcessResponse(t *testing.T, ctx context.CLIContext, obj interface{}, expectedBody []byte, indent bool) {
-	if indent {
-		ctx.Indent = indent
-	}
-
+func runPostProcessResponse(t *testing.T, ctx client.Context, obj interface{}, expectedBody []byte) {
 	// test using regular struct
 	w := httptest.NewRecorder()
 
@@ -413,13 +402,8 @@ func runPostProcessResponse(t *testing.T, ctx context.CLIContext, obj interface{
 	require.Nil(t, err)
 	require.Equal(t, expectedBody, body)
 
-	marshalled, err := ctx.Codec.MarshalJSON(obj)
+	marshalled, err := ctx.LegacyAmino.MarshalJSON(obj)
 	require.NoError(t, err)
-
-	if indent {
-		marshalled, err = codec.MarshalIndentFromJSON(marshalled)
-		require.NoError(t, err)
-	}
 
 	// test using marshalled struct
 	w = httptest.NewRecorder()

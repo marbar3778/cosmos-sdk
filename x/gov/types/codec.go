@@ -3,25 +3,31 @@ package types
 import (
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/codec/types"
+	cryptocodec "github.com/cosmos/cosmos-sdk/crypto/codec"
+	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
-// Codec defines the interface required to serialize custom x/gov types.
-type Codec interface {
-	codec.Marshaler
-
-	MarshalProposal(Proposal) ([]byte, error)
-	UnmarshalProposal([]byte) (Proposal, error)
+// RegisterLegacyAminoCodec registers all the necessary types and interfaces for the
+// governance module.
+func RegisterLegacyAminoCodec(cdc *codec.LegacyAmino) {
+	cdc.RegisterInterface((*Content)(nil), nil)
+	cdc.RegisterConcrete(&MsgSubmitProposal{}, "cosmos-sdk/MsgSubmitProposal", nil)
+	cdc.RegisterConcrete(&MsgDeposit{}, "cosmos-sdk/MsgDeposit", nil)
+	cdc.RegisterConcrete(&MsgVote{}, "cosmos-sdk/MsgVote", nil)
+	cdc.RegisterConcrete(&TextProposal{}, "cosmos-sdk/TextProposal", nil)
 }
 
-// RegisterCodec registers all the necessary types and interfaces for the
-// governance module.
-func RegisterCodec(cdc *codec.Codec) {
-	cdc.RegisterInterface((*Content)(nil), nil)
-	cdc.RegisterConcrete(MsgSubmitProposalBase{}, "cosmos-sdk/MsgSubmitProposalBase", nil)
-	cdc.RegisterConcrete(&MsgSubmitProposal{}, "cosmos-sdk/MsgSubmitProposal", nil)
-	cdc.RegisterConcrete(MsgDeposit{}, "cosmos-sdk/MsgDeposit", nil)
-	cdc.RegisterConcrete(MsgVote{}, "cosmos-sdk/MsgVote", nil)
-	cdc.RegisterConcrete(&TextProposal{}, "cosmos-sdk/TextProposal", nil)
+func RegisterInterfaces(registry types.InterfaceRegistry) {
+	registry.RegisterImplementations((*sdk.Msg)(nil),
+		&MsgSubmitProposal{},
+		&MsgVote{},
+		&MsgDeposit{},
+	)
+	registry.RegisterInterface(
+		"cosmos.gov.v1beta1.Content",
+		(*Content)(nil),
+		&TextProposal{},
+	)
 }
 
 // RegisterProposalTypeCodec registers an external proposal content type defined
@@ -35,7 +41,7 @@ func RegisterProposalTypeCodec(o interface{}, name string) {
 }
 
 var (
-	amino = codec.New()
+	amino = codec.NewLegacyAmino()
 
 	// ModuleCdc references the global x/gov module codec. Note, the codec should
 	// ONLY be used in certain instances of tests and for JSON encoding as Amino is
@@ -43,10 +49,10 @@ var (
 	//
 	// The actual codec used for serialization should be provided to x/gov and
 	// defined at the application level.
-	ModuleCdc = codec.NewHybridCodec(amino, types.NewInterfaceRegistry())
+	ModuleCdc = codec.NewAminoCodec(amino)
 )
 
 func init() {
-	RegisterCodec(amino)
-	codec.RegisterCrypto(amino)
+	RegisterLegacyAminoCodec(amino)
+	cryptocodec.RegisterCrypto(amino)
 }

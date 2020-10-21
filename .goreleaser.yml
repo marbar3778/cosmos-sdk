@@ -1,13 +1,13 @@
 ---
-project_name: relayer
+project_name: cosmos-sdk
 
 release:
   github:
-    owner: marbar3778
+    owner: cosmos
     name: cosmos-sdk
 
 builds:
-  skip: true
+  - skip: true
 
 archives:
   - format: tar.gz
@@ -22,9 +22,6 @@ archives:
 
 snapshot:
   name_template: SNAPSHOT-{{ .Commit }}
-
-checksum:
-  name_template: "{{ .ProjectName }}-{{ .Version }}-checksums.txt"
 
 changelog:
   skip: true

@@ -5,12 +5,12 @@ import (
 	"fmt"
 
 	"github.com/tendermint/crypto/bcrypt"
-
 	"github.com/tendermint/tendermint/crypto"
 	"github.com/tendermint/tendermint/crypto/armor"
-	cryptoAmino "github.com/tendermint/tendermint/crypto/encoding/amino"
 	"github.com/tendermint/tendermint/crypto/xsalsa20symmetric"
 
+	"github.com/cosmos/cosmos-sdk/codec/legacy"
+	cryptoAmino "github.com/cosmos/cosmos-sdk/crypto/codec"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 )
 
@@ -152,7 +152,7 @@ func encryptPrivKey(privKey crypto.PrivKey, passphrase string) (saltBytes []byte
 	}
 
 	key = crypto.Sha256(key) // get 32 bytes
-	privKeyBytes := privKey.Bytes()
+	privKeyBytes := legacy.Cdc.Amino.MustMarshalBinaryBare(privKey)
 
 	return saltBytes, xsalsa20symmetric.EncryptSymmetric(privKeyBytes, key)
 }
