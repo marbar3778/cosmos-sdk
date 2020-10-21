@@ -22,7 +22,7 @@ jobs:
 
       - name:  Set Version
         id: version
-        run: echo ::set-output name=version::echo ${{ github.ref }} | sed 's/.*release \(.*\)x/\1/'
+        run: echo ::set-output name=version::echo refs/heads/release/v0.40.x | sed 's/.*release\/\(.*\).x/\1/'
         if: contains(github.ref,'release/v')
 
       - name: Prepare
