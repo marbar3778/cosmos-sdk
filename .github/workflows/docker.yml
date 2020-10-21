@@ -23,7 +23,7 @@ jobs:
       - name: Get current date
         id: version
         run: echo "::set-output name=version::echo ${{ github.ref }} | sed 's/.*release \(.*\)x/\1/'
-        if: startWith(github.ref,'release')
+        if: github.ref =='release/v*'
 
       - name: Prepare
         id: prep
