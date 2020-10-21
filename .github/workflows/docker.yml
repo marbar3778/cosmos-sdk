@@ -20,10 +20,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Get current date
+      - name:  Set Version
         id: version
-        run: echo "::set-output name=version::echo ${{ github.ref }} | sed 's/.*release \(.*\)x/\1/'
-        if: github.ref =='release/v*'
+        run: echo ::set-output name=version::echo ${{ github.ref }} | sed 's/.*release \(.*\)x/\1/'
+        if: contains(github.ref,'release/v')
 
       - name: Prepare
         id: prep
